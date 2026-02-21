@@ -96,7 +96,10 @@ def get_executive_summary(
 ) -> dict:
     """Compute health score and top-level stats for the dashboard."""
     avg_rating = eda_stats.get("avg_rating", 3.0)
-    top_issues = impact_df.head(3)["theme_label"].tolist() if len(impact_df) > 0 else []
+
+    # Risk themes = themes with negative rating impact, sorted by severity
+    negative_themes = impact_df[impact_df["rating_impact"] < 0]
+    top_issues = negative_themes.head(3)["theme_label"].tolist() if len(negative_themes) > 0 else []
 
     health_score = int((avg_rating / 5.0) * 100) if avg_rating else 50
 

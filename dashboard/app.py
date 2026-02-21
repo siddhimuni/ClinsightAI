@@ -430,15 +430,13 @@ elif page == "Evaluation":
     eval_metrics = results["eval_metrics"]
     test_results = results["test_results"]
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Avg Precision", f"{eval_metrics['avg_precision']:.3f}")
     with col2:
         st.metric("Avg Recall", f"{eval_metrics['avg_recall']:.3f}")
     with col3:
         st.metric("Avg F1 Score", f"{eval_metrics['avg_f1']:.3f}")
-    with col4:
-        st.metric("Perfect Match", f"{eval_metrics['perfect_match_rate']:.0%}")
 
     st.markdown("---")
 

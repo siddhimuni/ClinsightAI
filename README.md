@@ -1,8 +1,8 @@
 # HackVerse 2026 | ClinsightAI
 
 **Company Track:** Clinsight
-**Team Name:** [Your Team Name]
-**Team Members:** [Names]
+**Team Name:** Neural Ninjas
+**Team Members:** Abhiram M V, Siddhi Muni, Jayan Agarwal
 
 ---
 
@@ -11,8 +11,6 @@
 **Which company problem did you choose?**
 
 ClinsightAI — AI-Powered Healthcare Review Intelligence System.
-
-**Restated in our own words:**
 
 Multi-location healthcare groups collect thousands of patient reviews, but this data sits unused because it is unstructured, noisy, and hard to translate into operational action. Hospital administrators cannot easily answer: *Which specific operational problems are hurting our ratings? Are they systemic or isolated? What should we fix first?*
 

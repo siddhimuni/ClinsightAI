@@ -364,6 +364,20 @@ elif page == "Systemic Issues":
             st.markdown(f"- {item}")
 
     st.markdown("---")
+    st.subheader("Severity & Escalation Scores")
+    if len(impact_df) > 0:
+        display_cols = ["theme_label", "severity_score", "escalation_score", "rating_impact", "issue_class"]
+        available = [c for c in display_cols if c in impact_df.columns]
+        st.dataframe(
+            impact_df.sort_values("severity_score", ascending=False)[available].rename(columns={
+                "theme_label": "Theme", "severity_score": "Severity Score",
+                "escalation_score": "Escalation Score", "rating_impact": "Rating Impact",
+                "issue_class": "Classification",
+            }),
+            use_container_width=True, hide_index=True,
+        )
+
+    st.markdown("---")
     st.subheader("Escalation Risk Ranking")
     if len(impact_df) > 0:
         fig = px.bar(

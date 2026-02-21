@@ -1,38 +1,82 @@
 """
 Systemic Issue Detection
 
-Classifies themes as SYSTEMIC / MODERATE / ISOLATED based on frequency
-and rating impact. Labels each review with a risk cluster.
+Classifies themes as SYSTEMIC / MODERATE / ISOLATED using variance-based
+consistency analysis on cosine similarity scores, combined with frequency
+and rating impact.
 """
 
+import numpy as np
 import pandas as pd
-from src.config import THEMES, THEME_LABELS, SYSTEMIC_THRESHOLD, ISOLATED_THRESHOLD
+from src.config import THEMES, THEME_LABELS
 
 
-def classify_issues(impact_df: pd.DataFrame) -> pd.DataFrame:
+def _compute_consistency(df: pd.DataFrame, theme: str) -> float:
     """
-    Classify each theme based on frequency AND negative rating impact.
-    - SYSTEMIC: frequent (>12%) and hurts ratings
-    - MODERATE: moderately frequent (>3%)
-    - ISOLATED: rare (<3%)
+    Measure detection consistency via coefficient of variation (CV) of
+    similarity scores among reviews where the theme was detected.
+    Low CV = theme appears with uniform strength = systemic pattern.
+    Returns a value in [0, 1] where 1 = perfectly consistent.
+    """
+    sim_col = f"sim_{theme}"
+    theme_col = f"theme_{theme}"
+
+    if sim_col not in df.columns or theme_col not in df.columns:
+        return 0.5
+
+    detected_sims = df.loc[df[theme_col] == True, sim_col]
+
+    if len(detected_sims) < 3:
+        return 0.0
+
+    mean_sim = detected_sims.mean()
+    if mean_sim == 0:
+        return 0.0
+
+    cv = detected_sims.std() / mean_sim
+    return round(max(0.0, 1.0 - cv), 4)
+
+
+def classify_issues(impact_df: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Classify each theme using a composite systemic score built from three
+    normalized signals:
+      - Consistency (0.4): low variance in similarity scores among detected reviews
+      - Frequency  (0.3): proportion of reviews mentioning the theme
+      - Impact     (0.3): absolute magnitude of rating shift
+
+    SYSTEMIC  = score >= 0.5 AND negative rating impact
+    ISOLATED  = score < 0.25
+    MODERATE  = everything else
     """
     impact_df = impact_df.copy()
 
-    def _classify(row):
-        freq = row["frequency_pct"] / 100
-        has_negative_impact = row["rating_impact"] < 0
+    impact_df["consistency"] = [
+        _compute_consistency(df, row["theme"])
+        for _, row in impact_df.iterrows()
+    ]
 
-        if freq >= SYSTEMIC_THRESHOLD and has_negative_impact:
+    max_freq = impact_df["frequency_pct"].max()
+    max_impact = impact_df["rating_impact"].abs().max()
+    norm_freq = impact_df["frequency_pct"] / max_freq if max_freq > 0 else 0
+    norm_impact = impact_df["rating_impact"].abs() / max_impact if max_impact > 0 else 0
+
+    W_CONSISTENCY, W_FREQUENCY, W_IMPACT = 0.4, 0.3, 0.3
+    impact_df["systemic_score"] = (
+        W_CONSISTENCY * impact_df["consistency"]
+        + W_FREQUENCY * norm_freq
+        + W_IMPACT * norm_impact
+    ).round(3)
+
+    def _classify(row):
+        if row["systemic_score"] >= 0.5 and row["rating_impact"] < 0:
             return "SYSTEMIC"
-        elif freq >= ISOLATED_THRESHOLD:
-            return "MODERATE"
-        else:
+        if row["systemic_score"] < 0.25:
             return "ISOLATED"
+        return "MODERATE"
 
     impact_df["issue_class"] = impact_df.apply(_classify, axis=1)
-
-    # Escalation score reuses severity_score (frequency × |rating_impact|)
-    impact_df["escalation_score"] = impact_df["severity_score"]
+    impact_df["escalation_score"] = impact_df["systemic_score"]
 
     return impact_df
 
@@ -62,7 +106,7 @@ def detect_trends(df: pd.DataFrame) -> dict:
 def get_systemic_summary(impact_df: pd.DataFrame) -> dict:
     """Summarize systemic vs isolated issues from an already-classified impact table."""
     if "issue_class" not in impact_df.columns:
-        impact_df = classify_issues(impact_df)
+        raise ValueError("impact_df must be classified first — call classify_issues(impact_df, df)")
 
     systemic = impact_df[impact_df["issue_class"] == "SYSTEMIC"]["theme_label"].tolist()
     moderate = impact_df[impact_df["issue_class"] == "MODERATE"]["theme_label"].tolist()
@@ -91,7 +135,7 @@ if __name__ == "__main__":
     df = run_theme_extraction(df)
     summary = get_theme_summary(df)
     impact = build_impact_table(df, summary)
-    impact = classify_issues(impact)
+    impact = classify_issues(impact, df)
     df = cluster_reviews(df)
 
     print("\nClassified Issues:")

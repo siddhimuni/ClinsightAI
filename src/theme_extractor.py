@@ -55,6 +55,7 @@ def run_theme_extraction(df: pd.DataFrame, use_claude: bool = True) -> pd.DataFr
         scores = sim_matrix[:, i]
         df[f"theme_{theme}"] = scores >= SIMILARITY_THRESHOLD
         df[f"severity_{theme}"] = np.where(scores >= SIMILARITY_THRESHOLD, np.round(scores, 2), 0.0)
+        df[f"sim_{theme}"] = np.round(scores, 4)
 
     df["themes_detected"] = [
         [theme_names[j] for j in range(len(theme_names)) if sim_matrix[i, j] >= SIMILARITY_THRESHOLD]

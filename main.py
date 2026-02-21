@@ -46,7 +46,7 @@ def run_pipeline(data_path: str, output_path: str):
     print(f"      Top theme by impact: {impact_df.iloc[0]['theme_label']} ({impact_df.iloc[0]['rating_impact']:+.2f} stars)")
 
     print("\n[4/7] Detecting systemic issues...")
-    impact_df = classify_issues(impact_df)
+    impact_df = classify_issues(impact_df, df)
     df = cluster_reviews(df)
     systemic_summary = get_systemic_summary(impact_df)
     print(f"      Systemic issues: {systemic_summary['systemic_count']} | "

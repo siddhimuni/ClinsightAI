@@ -44,7 +44,7 @@ def run_full_analysis(data_path: str):
     df = run_theme_extraction(df)
     theme_summary = get_theme_summary(df)
     impact_df = build_impact_table(df, theme_summary)
-    impact_df = classify_issues(impact_df)
+    impact_df = classify_issues(impact_df, df)
     df = cluster_reviews(df)
     systemic_summary = get_systemic_summary(impact_df)
 
@@ -71,24 +71,8 @@ with st.sidebar:
     st.markdown("*AI-Driven Healthcare Review Intelligence*")
     st.divider()
 
-    st.markdown("### Data Source")
-    data_option = st.radio(
-        "Choose data source",
-        ["Use default dataset", "Upload CSV file"],
-        index=0,
-    )
-
     data_path = "data/hospital.csv"
-    if data_option == "Upload CSV file":
-        uploaded_file = st.file_uploader("Upload hospital reviews CSV", type=["csv"])
-        if uploaded_file:
-            save_path = "data/uploaded_reviews.csv"
-            os.makedirs("data", exist_ok=True)
-            with open(save_path, "wb") as f:
-                f.write(uploaded_file.read())
-            data_path = save_path
 
-    st.divider()
     st.markdown("### Navigation")
     page = st.radio(
         "Go to",

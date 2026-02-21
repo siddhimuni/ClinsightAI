@@ -31,5 +31,3 @@ THEME_LABELS = {
     "parking": "Parking & Access",
 }
 
-SYSTEMIC_THRESHOLD = 0.12
-ISOLATED_THRESHOLD = 0.03

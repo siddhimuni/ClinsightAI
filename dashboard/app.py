@@ -413,11 +413,7 @@ elif page == "Action Roadmap":
             expanded=(item.get("priority", 99) == 1),
         ):
             st.markdown(f"**Recommendation:** {item.get('recommendation', '')}")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**Expected Rating Lift:** {item.get('expected_rating_lift', 'N/A')}")
-            with col2:
-                st.markdown(f"**Confidence:** {item.get('confidence', 'N/A')}")
+            st.markdown(f"**Confidence:** {item.get('confidence', 'N/A')}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -11,3 +11,5 @@ python-dotenv>=1.0.0
 networkx>=3.3
 scipy>=1.13.0
 tqdm>=4.66.0
+sentence_transformers
+groq

@@ -107,7 +107,7 @@ This file validates our theme extraction accuracy and generates two visualizatio
 - `plot_similarity_distribution()` samples 200 reviews, encodes them, and generates a 3×3 grid of histograms showing the cosine similarity distribution for each theme. Each histogram has the 0.3 threshold as a red dashed line. This shows how cleanly the threshold separates matching from non-matching reviews.
 - `plot_regression_diagnostics()` generates a two-panel figure. The left panel shows the Ridge coefficient per theme as a horizontal bar chart — red for negative impact, green for positive. The right panel shows bootstrap confidence per theme.
 
-Results: precision 0.791, recall 0.666, F1 0.709, perfect match rate 50%.
+Results: precision 0.791, recall 0.666, F1 0.709.
 
 ### `main.py` — Pipeline Orchestrator
 
@@ -267,6 +267,9 @@ A: No. The LLM only generates natural language recommendations at the very end. 
 
 **Q: How does the variance-based systemic detection work?**
 A: We compute the coefficient of variation of cosine similarity scores among reviews where each theme was detected. Low variance means the theme appears consistently across many reviews with uniform strength — that is a systemic pattern. We combine this consistency signal with frequency and impact magnitude into a weighted composite score. A theme needs a score of 0.5 or higher AND negative rating impact to be classified as systemic. This is more principled than a single frequency threshold because it captures whether the problem is uniformly experienced by patients, not just how often it is mentioned.
+
+**Q: Why not use K-Means or another clustering algorithm for theme detection?**
+A: K-Means clusters reviews by similarity, but the clusters are unlabeled — you get Cluster 0, Cluster 1, Cluster 2, and then you have to manually inspect each one to figure out what it represents. Worse, the number of clusters is a hyperparameter you have to guess upfront, and a single review can only belong to one cluster, so a review about both wait time and billing would be forced into one bucket. Our approach avoids all three problems: themes are pre-defined with meaningful names a hospital manager recognizes, we do not need to guess K, and a single review can match multiple themes simultaneously because we compute cosine similarity independently for each theme.
 
 **Q: How would this scale to multiple hospitals?**
 A: The pipeline takes any CSV with review text and ratings. You would run it per hospital and compare outputs. The architecture is stateless and modular, so parallelization is straightforward.

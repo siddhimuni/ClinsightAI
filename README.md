@@ -404,6 +404,12 @@ ClinsightAI/
 
 ---
 
+## 📹 Demo Video
+
+[Watch the full demo on Loom](https://www.loom.com/share/85e24dfda8e5425da0c4ca7156dd07f0)
+
+---
+
 ## 📜 Compliance Statement
 
 We confirm that this project was developed during HackVerse 2026.

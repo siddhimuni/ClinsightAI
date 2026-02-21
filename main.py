@@ -15,10 +15,10 @@ import sys
 
 from src.data_loader import load_dataset, preprocess, get_eda_stats
 from src.theme_extractor import run_theme_extraction, get_theme_summary
-from src.impact_quantifier import build_impact_table, get_rating_segments
-from src.systemic_detector import classify_issues, detect_trends, cluster_reviews, get_systemic_summary
+from src.impact_quantifier import build_impact_table
+from src.systemic_detector import classify_issues, cluster_reviews, get_systemic_summary
 # from src.financial_simulator import run_full_simulation, get_portfolio_impact, get_causal_chains
-from src.roadmap_generator import generate_roadmap_claude, get_executive_summary
+from src.roadmap_generator import generate_roadmap, get_executive_summary
 from src.config import MOCK_MODE
 
 
@@ -54,16 +54,14 @@ def run_pipeline(data_path: str, output_path: str):
     print("\n[4/6] Detecting systemic issues...")
     impact_df = classify_issues(impact_df)
     df = cluster_reviews(df)
-    trend_data = detect_trends(df)
     systemic_summary = get_systemic_summary(impact_df)
     print(f"      Systemic issues: {systemic_summary['systemic_count']} | "
           f"Moderate: {len(systemic_summary['moderate_issues'])}")
 
     # Phase 6: Roadmap generation
     print("\n[5/6] Generating action roadmap...")
-    sim_df = None
-    roadmap = generate_roadmap_claude(impact_df, sim_df, eda_stats)
-    exec_summary = get_executive_summary(eda_stats, impact_df, sim_df, systemic_summary)
+    roadmap = generate_roadmap(impact_df, eda_stats)
+    exec_summary = get_executive_summary(eda_stats, impact_df, systemic_summary)
 
     # Phase 7: Compile output
     print("\n[6/6] Compiling structured output...")
@@ -92,20 +90,7 @@ def run_pipeline(data_path: str, output_path: str):
             }
             for _, row in impact_df.iterrows()
         ],
-        "improvement_roadmap": {
-            "quick_wins": roadmap.get("quick_wins", [])[:4],
-            "strategic": roadmap.get("strategic", [])[:4],
-            "long_term": roadmap.get("long_term", []),
-        },
-        "trend_analysis": {
-            "available": trend_data.get("available", False),
-            "rising_themes": trend_data.get("rising_themes", []),
-        },
-        "rating_segments": {
-            "top_themes_in_1star_reviews": dict(
-                list(segments.items())[:5]
-            ) if (segments := get_rating_segments(df)) else {},
-        },
+        "improvement_roadmap": roadmap,
     }
 
     # Save output

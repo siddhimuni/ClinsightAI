@@ -2,7 +2,7 @@
 Impact Quantification
 
 Uses Ridge regression to estimate how much each theme affects the rating.
-Outputs a ranked impact table used by the financial simulator and roadmap.
+Per-theme confidence is computed via bootstrap resampling.
 """
 
 import pandas as pd
@@ -16,7 +16,7 @@ from src.config import THEMES, THEME_LABELS
 def run_regression(df: pd.DataFrame) -> dict:
     """
     Ridge regression: rating ~ theme booleans.
-    Returns each theme's coefficient (how much it shifts the rating).
+    Returns coefficients, R², and per-theme bootstrap confidence intervals.
     """
     theme_cols = [f"theme_{t}" for t in THEMES if f"theme_{t}" in df.columns]
     X = df[theme_cols].fillna(0).astype(float)
@@ -29,35 +29,61 @@ def run_regression(df: pd.DataFrame) -> dict:
     model = Ridge(alpha=1.0)
     model.fit(X_scaled, y)
 
-    cv_score = cross_val_score(model, X_scaled, y, cv=5, scoring="r2")
-    r2 = round(float(np.mean(cv_score)), 3)
+    cv_scores = cross_val_score(model, X_scaled, y, cv=5, scoring="r2")
+    r2 = round(float(np.mean(cv_scores)), 3)
 
     coefficients = {}
     for col, coef in zip(theme_cols, model.coef_):
         theme = col.replace("theme_", "")
         coefficients[theme] = round(float(coef), 4)
 
-    return {"coefficients": coefficients, "r2_score": r2}
+    # Bootstrap confidence: resample 100 times, measure coefficient stability
+    n_bootstrap = 100
+    bootstrap_coefs = {col.replace("theme_", ""): [] for col in theme_cols}
+    rng = np.random.RandomState(42)
+
+    for _ in range(n_bootstrap):
+        idx = rng.choice(len(X_scaled), size=len(X_scaled), replace=True)
+        m = Ridge(alpha=1.0)
+        m.fit(X_scaled[idx], y.iloc[idx])
+        for col, coef in zip(theme_cols, m.coef_):
+            bootstrap_coefs[col.replace("theme_", "")].append(coef)
+
+    # Confidence = proportion of bootstrap samples where sign matches the main estimate
+    confidence_per_theme = {}
+    for theme, samples in bootstrap_coefs.items():
+        main_sign = np.sign(coefficients[theme])
+        if main_sign == 0:
+            confidence_per_theme[theme] = 0.5
+        else:
+            agreement = np.mean(np.sign(samples) == main_sign)
+            confidence_per_theme[theme] = round(float(agreement), 2)
+
+    return {
+        "coefficients": coefficients,
+        "r2_score": r2,
+        "confidence": confidence_per_theme,
+    }
 
 
 def build_impact_table(df: pd.DataFrame, theme_summary: pd.DataFrame) -> pd.DataFrame:
     """
-    Build the ranked impact table per theme:
-    - rating_impact: regression coefficient (how much the theme shifts rating)
-    - severity_score: frequency × |rating_impact| (how widespread AND impactful)
+    Build the ranked impact table per theme.
+    Severity score is normalized to 0-1.
+    Confidence is per-theme (bootstrap sign stability).
     """
     regression = run_regression(df)
     coefs = regression.get("coefficients", {})
+    conf = regression.get("confidence", {})
 
     rows = []
     for _, row in theme_summary.iterrows():
         theme = row["theme"]
         freq_pct = row["frequency_pct"]
         rating_delta = row.get("rating_delta", 0) or 0
-        coef = coefs.get(theme, 0)
 
-        rating_impact = round(coef, 3)
-        severity_score = round((freq_pct / 100) * abs(rating_impact), 3)
+        rating_impact = round(coefs.get(theme, 0), 3)
+        raw_severity = (freq_pct / 100) * abs(rating_impact)
 
         rows.append({
             "theme": theme,
@@ -66,13 +92,21 @@ def build_impact_table(df: pd.DataFrame, theme_summary: pd.DataFrame) -> pd.Data
             "frequency_count": row["frequency_count"],
             "rating_impact": rating_impact,
             "rating_delta": rating_delta,
-            "severity_score": severity_score,
-            "regression_coef": coef,
-            "confidence": regression["r2_score"],
+            "raw_severity": raw_severity,
+            "confidence": conf.get(theme, 0.5),
             "evidence_samples": row.get("evidence_samples", []),
         })
 
     impact_df = pd.DataFrame(rows)
+
+    # Normalize severity to 0-1
+    max_sev = impact_df["raw_severity"].max()
+    if max_sev > 0:
+        impact_df["severity_score"] = round(impact_df["raw_severity"] / max_sev, 2)
+    else:
+        impact_df["severity_score"] = 0.0
+    impact_df = impact_df.drop(columns=["raw_severity"])
+
     impact_df = impact_df.sort_values("severity_score", ascending=False).reset_index(drop=True)
     impact_df["rank"] = range(1, len(impact_df) + 1)
 
@@ -80,7 +114,7 @@ def build_impact_table(df: pd.DataFrame, theme_summary: pd.DataFrame) -> pd.Data
 
 
 def get_rating_segments(df: pd.DataFrame) -> dict:
-    """Show which themes dominate low-rating vs high-rating reviews."""
+    """Which themes dominate 1-2 star vs 4-5 star reviews."""
     low_df = df[df["rating"] <= 2]
     high_df = df[df["rating"] >= 4]
 
@@ -92,9 +126,9 @@ def get_rating_segments(df: pd.DataFrame) -> dict:
         if col not in df.columns:
             continue
         if len(low_df) > 0:
-            low_themes[theme] = round(low_df[col].mean() * 100, 1)
+            low_themes[THEME_LABELS[theme]] = round(low_df[col].mean() * 100, 1)
         if len(high_df) > 0:
-            high_themes[theme] = round(high_df[col].mean() * 100, 1)
+            high_themes[THEME_LABELS[theme]] = round(high_df[col].mean() * 100, 1)
 
     return {
         "low_rating_themes": dict(sorted(low_themes.items(), key=lambda x: x[1], reverse=True)),
@@ -115,7 +149,7 @@ if __name__ == "__main__":
     impact = build_impact_table(df, summary)
 
     print("\nImpact Table:")
-    print(impact[["rank", "theme_label", "frequency_pct", "rating_impact", "severity_score"]].to_string(index=False))
+    print(impact[["rank", "theme_label", "frequency_pct", "rating_impact", "severity_score", "confidence"]].to_string(index=False))
 
     segments = get_rating_segments(df)
     print(f"\nLow-rating themes (n={segments['n_low']}):", segments["low_rating_themes"])
